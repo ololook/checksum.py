@@ -1,8 +1,11 @@
+#encoding: utf-8
+__author__ ='zhangyuanxiang'
 from multiprocessing import Pool
 import time
 import sys
 import MySQLdb
 import MySQLdb.cursors
+from optparse import OptionParser
 import cx_Oracle
 import hashlib
 from sys import argv
@@ -10,12 +13,32 @@ reload(sys )
 sys.setdefaultencoding('utf8')
 error=[]
 presult=[]
-def source_client():
+
+def get_cli_options():
+    parser = OptionParser(usage="usage: python %prog [options]",
+                          description="""MySQL Table Checksum""")
+
+    parser.add_option("-H", "--f_dsn",
+                      dest="f",
+                      default="127.0.0.1:3306:db:table",
+                      metavar="host:port:db:table"
+                      )
+
+    parser.add_option("-L", "--t_dsn",
+                      dest="t",
+                      default="127.0.0.1:3306:db:table",
+                      metavar="host:port:db:table"
+                     )
+    (options, args) = parser.parse_args()
+
+    return options
+
+def source_client(ip,port):
       try:
-         con = MySQLdb.connect(host ='127.0.0.1',
+         con = MySQLdb.connect(host =ip,
                              user ='username',
                              passwd ='passwd',
-                             port =7307,
+                             port =int(port),
                              charset='utf8',
                              cursorclass = MySQLdb.cursors.SSCursor
                               )
@@ -23,9 +46,9 @@ def source_client():
           print "source_client ",e
       return con
  
-def source_table():
-       cur = source_client().cursor()
-       sql_1="select * from gmonitor.test_01 where 0=1"
+def source_table(db,table,ip,port):
+       cur = source_client(ip,port).cursor()
+       sql_1="select * from %s.%s where 0=1" %(db,table)
        row=""
        try:
           cur.execute(sql_1)
@@ -37,16 +60,16 @@ def source_table():
            else:
                   row +=','+cur.description[i][0]
                   i=i+1
-           cols="select "+"concat_ws"+"("+'"||"'+","+row+")"+" "+"from "+"gmonitor.test_01 order by id "
+           cols="select "+"concat_ws"+"("+'"||"'+","+row+")"+" "+"from "+"%s.%s  " %(db,table)
        return cols
 
 
-def destin_client():
+def destin_client(ip,port):
       try:
-         con = MySQLdb.connect(host ='127.0.0.1',
+         con = MySQLdb.connect(host =ip,
                              user ='username',
                              passwd ='passwd',
-                             port =7307,
+                             port =int(port),
                              charset='utf8',
                              cursorclass = MySQLdb.cursors.SSCursor
                               )
@@ -55,9 +78,9 @@ def destin_client():
       
       return con
 
-def destin_table():
-       cur = destin_client().cursor()
-       sql_1="select * from gmonitor.test_02 where 0=1"
+def destin_table(db,table,ip,port):
+       cur = destin_client(ip,port).cursor()
+       sql_1="select * from %s.%s where 0=1" %(db,table)
        row=""
        try:
           cur.execute(sql_1)
@@ -69,51 +92,43 @@ def destin_table():
            else:
                   row +=','+cur.description[i][0]
                   i=i+1
-           cols="select "+"concat_ws"+"("+'"||"'+","+row+")"+" "+"from "+"gmonitor.test_02 order by id"
+           cols="select "+"concat_ws"+"("+'"||"'+","+row+")"+" "+"from "+"%s.%s " %(db,table)
        return cols
 
-def remove_values_from_list(the_list, val):
-    return [value for value in the_list if value != val]
-
-def compare_row(source_1,destin_1,num):
-    offset=num
-    lg=len(source_1)
-    for i in range(0,lg,offset):
-        destin2=destin_1[i:i+offset]
-        source2=source_1[i:i+offset]
-        source1_md5=hashlib.md5(str(source2)).hexdigest()
-        destin1_md5=hashlib.md5(str(destin2)).hexdigest()
-        if  source1_md5 != destin1_md5:
-           for s in source2:
-               s_md=hashlib.md5(str(s)).hexdigest()
-               for d in destin2:
-                   d_md=hashlib.md5(str(d)).hexdigest()
-                   if s_md==d_md:
-                      while s in error: 
-                            error.remove(s)
-                      break
-                   else:
-                      if s not in error:
-                         error.append(s)
-        else:   
-           continue
-    for x in error:
-        x_md=hashlib.md5(str(x)).hexdigest()
-        for y in destin_1:
-            y_md=hashlib.md5(str(y)).hexdigest()
-            if x_md==y_md:
-               while x in error: 
-                    error.remove(x)
-               break
-            else:
-               pass
+def compare_row(source_1,destin_1):
+    
+   for s in source_1:
+       if s not in destin_1 and s not in error:
+          error.append(s)
+       else:
+          continue
+   for l in destin_1:
+       if l not in source_1:
+          presult.append(l)
+   for x in error:
+       if x in destin_1 or x in presult:
+          error.remove(x)   
+       else:
+          pass
+     
 def compare_table():
     batch=500
     lag=0
-    source_cur=source_client().cursor()
-    destin_cur=destin_client().cursor()
-    source_sql=source_table()
-    destin_sql=destin_table()
+    options = get_cli_options()
+    h=options.f
+    j=options.t 
+    f_h=h.strip().split(':')[0]
+    f_p=h.strip().split(':')[1]
+    f_d=h.strip().split(':')[2]  
+    f_t=h.strip().split(':')[3]
+    t_h=j.strip().split(':')[0]
+    t_p=j.strip().split(':')[1]
+    t_d=j.strip().split(':')[2]                 
+    t_t=j.strip().split(':')[3]
+    source_cur=source_client(f_h,f_p).cursor()
+    destin_cur=destin_client(t_h,t_p).cursor()
+    source_sql=source_table(f_d,f_t,f_h,f_p)
+    destin_sql=destin_table(t_d,t_t,t_h,t_p)
     source_cur.execute(source_sql)
     destin_cur.execute(destin_sql)
     source_result = source_cur.fetchmany(batch) 
@@ -122,7 +137,7 @@ def compare_table():
           source_md5=hashlib.md5(str(source_result)).hexdigest()
           destin_md5=hashlib.md5(str(destin_result)).hexdigest()
           if source_md5 !=destin_md5:
-             compare_row(source_result,destin_result,100) 
+             compare_row(source_result,destin_result) 
           else:
              pass
           source_result=[]
