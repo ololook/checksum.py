@@ -35,8 +35,8 @@ def get_cli_options():
 def source_client(ip,port):
       try:
          con = MySQLdb.connect(host =ip,
-                             user ='dba_mon',
-                             passwd ='Vsd5evjaUzGESBP3',
+                             user ='username',
+                             passwd ='passwd',
                              port =int(port),
                              charset='utf8',
                              cursorclass = MySQLdb.cursors.SSCursor
@@ -66,8 +66,8 @@ def source_table(db,table,ip,port):
 def destin_client(ip,port):
       try:
          con = MySQLdb.connect(host =ip,
-                             user ='dba_mon',
-                             passwd ='Vsd5evjaUzGESBP3',
+                             user ='username',
+                             passwd ='passwd',
                              port =int(port),
                              charset='utf8',
                              cursorclass = MySQLdb.cursors.SSCursor
