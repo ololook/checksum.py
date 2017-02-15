@@ -15,8 +15,7 @@ error=[]
 presult=[]
 
 def get_cli_options():
-    parser = OptionParser(usage="usage: python %prog [options]",
-                          description="""MySQL Table Checksum""")
+    parser = OptionParser(usage="usage: python %prog [options]",description="""MySQL Table CheckSUM""")
 
     parser.add_option("-H", "--f_dsn",
                       dest="f",
@@ -36,8 +35,8 @@ def get_cli_options():
 def source_client(ip,port):
       try:
          con = MySQLdb.connect(host =ip,
-                             user ='username',
-                             passwd ='passwd',
+                             user ='dba_mon',
+                             passwd ='Vsd5evjaUzGESBP3',
                              port =int(port),
                              charset='utf8',
                              cursorclass = MySQLdb.cursors.SSCursor
@@ -67,8 +66,8 @@ def source_table(db,table,ip,port):
 def destin_client(ip,port):
       try:
          con = MySQLdb.connect(host =ip,
-                             user ='username',
-                             passwd ='passwd',
+                             user ='dba_mon',
+                             passwd ='Vsd5evjaUzGESBP3',
                              port =int(port),
                              charset='utf8',
                              cursorclass = MySQLdb.cursors.SSCursor
@@ -93,7 +92,7 @@ def destin_table(db,table,ip,port):
                   row +=','+cur.description[i][0]
                   i=i+1
            cols="select "+"concat_ws"+"("+'"||"'+","+row+")"+" "+"from "+"%s.%s " %(db,table)
-       return cols
+       return cols,"replace into %s.%s values " % (db,table)
 
 def compare_row(source_1,destin_1):
     
@@ -128,7 +127,7 @@ def compare_table():
     source_cur=source_client(f_h,f_p).cursor()
     destin_cur=destin_client(t_h,t_p).cursor()
     source_sql=source_table(f_d,f_t,f_h,f_p)
-    destin_sql=destin_table(t_d,t_t,t_h,t_p)
+    destin_sql,replstr=destin_table(t_d,t_t,t_h,t_p)
     source_cur.execute(source_sql)
     destin_cur.execute(destin_sql)
     source_result = source_cur.fetchmany(batch) 
@@ -144,6 +143,16 @@ def compare_table():
           destin_result=[]
           source_result = source_cur.fetchmany(batch)
     for i in error:
-        print i
+        head='("'
+        end='")'
+        var_col=[]
+        for var in list(i)[0].split("||"):
+           var_col.append(var)
+        strvar='","'.join(var_col)
+        c_v=head+strvar+end
+        insertsql= replstr+" "+c_v
+        print insertsql
+    
+            
 if __name__ == '__main__':
     compare_table()
